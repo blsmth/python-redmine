@@ -3,6 +3,20 @@
     This library will allow you to interact with Redmine issues and projects,
     including listing, creating and resolving issues.
     
+
+PLEASE NOTE:  This project is nowhere near finished.  Still needs a lot of refinement.
+As of now (6/11/11):
+issue retrieval and posting work
+project retrieval works
+
+TODO:
+finish Issue and Project classes
+finish issue posting and updating
+start project posting and updating
+documentation
+general clean up
+
+
     
 """
 
