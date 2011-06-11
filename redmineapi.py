@@ -58,12 +58,14 @@ class Issue(object):
                 project_id=None,
                 author=None,
                 subject=None,
-                description=None):
+                description=None,
+                tracker_id=None):
         self.id = id
         self.author = author
         self.project_id = project_id
         self.subject = subject
         self.description = description
+        self.tracker_id = tracker_id
     
     @staticmethod 
     def newFromJsonDict(data):
@@ -92,9 +94,8 @@ class Issue(object):
         ''' saves a new issue to the given API instance from Issue instance 
             if you need to update an issue, use update() instead.
         '''
-        newIssue = {'project_id': self.project_id,
-                    'issue': {'subject': self.subject,
-                              'description': self.description}}
+        newIssue = {
+                    'issue': self.__dict__}
         content = r._apiPost('issues',newIssue)
         return self.newFromJsonDict(content)
     
