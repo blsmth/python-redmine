@@ -25,7 +25,7 @@ else:
     from urllib2 import urlopen, Request
     from urllib2 import HTTPError
 
-import httplib2
+import httplib2  #turns out httplib2 is actually a lot better at handling JSON POST connections
 
 try:
     import json
@@ -50,7 +50,6 @@ class Issue(object):
         self.project_id = project_id
         self.subject = subject
         self.description = description
-        #print self
     
     @staticmethod 
     def newFromJsonDict(data):
@@ -154,8 +153,6 @@ class Redmine(object):
 
     def getIssues(self,**kwargs):
         results = self._apiGet('issues', kwargs)
-        #for i in results['issues']:
-        #    print i['id']
         return [Issue.newFromJsonDict(i) for i in results['issues']]
 
 
