@@ -68,7 +68,7 @@ class Issue(object):
         self.tracker_id = tracker_id
     
     @staticmethod 
-    def newFromJsonDict(data):
+    def newFromApi(data):
         return Issue(data['id'],
               data['project']['id'],
               data['author']['name'],
@@ -94,10 +94,10 @@ class Issue(object):
         ''' saves a new issue to the given API instance from Issue instance 
             if you need to update an issue, use update() instead.
         '''
-        newIssue = {
+        new_issue = {
                     'issue': self.__dict__}
-        content = r._apiPost('issues',newIssue)
-        return self.newFromJsonDict(content)
+        content = r._apiPost('issues',new_issue)
+        return self.newFromApi(content)
     
     
     
@@ -116,24 +116,26 @@ class Redmine(object):
        self.ISSUE_STATUS['CLOSE'] = 3
        self.apikey = apikey
        self.hostname = hostname
-       
-    def _apiGet(self,func,params=None):
+     
+    def check_reqs(self,func=None):
         if self.hostname is None:
             raise RedmineApiError('You must supply a Hostname to your redmine installation.')
         if self.apikey is None:
             raise RedmineApiError('Missing Redmine API Key.')
         if func is None:
             raise RedmineApiError('Missing function call.')
+    
+    def _apiGet(self,func,params=None):
+        self.check_reqs(func)
         
+        api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
         try:
-            params = urlencode(params,True)
-        except: 
-            params = ''
-        
-        api_url = 'http://%s/%s.json?key=%s&%s' % (self.hostname,func,self.apikey,params)
-        try:
-            response = urlopen(api_url).read().decode()
-            return json.loads(response)
+            h = httplib2.Http()
+            resp,content = h.request(api_url,
+                            'GET',
+                            json.dumps(params),
+                            headers={'Content-Type': 'application/json'})
+            return content
         except HTTPError, e:
             raise RedmineApiError("HTTPError - %s" % e.read())
         except (ValueError, KeyError), e:
@@ -142,6 +144,9 @@ class Redmine(object):
 
 
     def _apiPost(self,func,params=None):
+        self.check_reqs(func)
+        
+        
         api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
         try:
             
@@ -162,13 +167,13 @@ class Redmine(object):
     def getIssue(self,id=None):
         if id is None:
             raise RedmineApiError("You must provide an id to get a specific issue")
-        result = self._apiGet('issues/%s' % id)['issue']
-        return Issue.newFromJsonDict(result)
+        result = json.loads(self._apiGet('issues/%s' % id))['issue']
+        return Issue.newFromApi(result)
 
 
     def getIssues(self,**kwargs):
-        results = self._apiGet('issues', kwargs)
-        return [Issue.newFromJsonDict(i) for i in results['issues']]
+        results = json.loads(self._apiGet('issues', kwargs))['issues']
+        return [[Issue.newFromApi(i)] for i in results]
 
 
     
@@ -179,12 +184,12 @@ class Redmine(object):
             project_id = kwargs=['project_id']
             if project_id is None:
                 raise RedmineApiError("You must provide a project_id")
-            result = redmine._apiGet('projects/%s' % project_id)['project']
+            result = super(projects,self)._apiGet('projects/%s' % project_id)['project']
             return Project(result)
         
-        @staticmethod
-        def getList(**kwargs):
-            results = redmine._apiGet('projects',kwargs)
+
+        def getList(self,**kwargs):
+            results = super(projects,self)._apiGet('projects',kwargs)
             return [Project(p) for p in results['projects']]
     
     
