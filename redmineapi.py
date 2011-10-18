@@ -52,7 +52,7 @@ class RedmineApiError(Exception):
 
 
 class RedmineApiObject(object):
-    def __init__(self,d):
+    def __init__(self, d):
         self.__dict__ = d
 
 class Issue(RedmineApiObject):
@@ -66,23 +66,23 @@ class Issue(RedmineApiObject):
         #return json.dumps(self.__dict__)
         return '%s - %s - %s - %s' % (self.id,
                                  self.project['name'],
-                                        self.author['name'], 
+                                        self.author['name'],
                                         self.subject)
       
 
     def __unicode__(self):
         return '%s - %s - %s \n\n %s' % (self.id,
-                                        self.author['name'], 
-                                        self.subject, 
+                                        self.author['name'],
+                                        self.subject,
                                         self.description)
 
-    def save(self,r):
+    def save(self, r):
         ''' saves a new issue to the given API instance from Issue instance 
             if you need to update an issue, use update() instead.
         '''
         new_issue = {
                     'issue': self.__dict__}
-        content = r._apiPost('issues',new_issue)
+        content = r._apiPost('issues', new_issue)
         return self.newFromApi(content)
     
     
@@ -100,7 +100,7 @@ class Project(RedmineApiObject):
 class Redmine(object):
     
     
-    def __init__(self,hostname=None,apikey=None):
+    def __init__(self, hostname=None, apikey=None):
         # Status ID from a default install
        self.ISSUE_STATUS = {} 
        self.ISSUE_STATUS['new'] = 1
@@ -110,7 +110,7 @@ class Redmine(object):
        self.hostname = hostname
     
    
-    def check_reqs(self,func=None):
+    def check_reqs(self, func=None):
         if self.hostname is None:
             raise RedmineApiError('You must supply a Hostname to your redmine installation.')
         if self.apikey is None:
@@ -119,13 +119,13 @@ class Redmine(object):
             raise RedmineApiError('Missing function call.')
     
     
-    def _apiGet(self,func,params=None):
+    def _apiGet(self, func, params=None):
         self.check_reqs(func)
         
-        api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
+        api_url = 'http://%s/%s.json?key=%s' % (self.hostname, func, self.apikey)
         try:
             h = httplib2.Http()
-            resp,content = h.request(api_url,
+            resp, content = h.request(api_url,
                             'GET',
                             json.dumps(params),
                             headers={'Content-Type': 'application/json'})
@@ -136,10 +136,10 @@ class Redmine(object):
             raise RedmineApiError('Invalid Response - %s', e.code())         
                 
 
-    def _apiPost(self,func,params=None):
+    def _apiPost(self, func, params=None):
         self.check_reqs(func)
     
-        api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
+        api_url = 'http://%s/%s.json?key=%s' % (self.hostname, func, self.apikey)
         try:
             
             h = httplib2.Http()
@@ -159,15 +159,15 @@ class Redmine(object):
         def __init__(self, redmine):
             self.redmine = redmine
         
-        def get(self,**kwargs):
-            issue_id = kwargs=['issue_id']
+        def get(self, **kwargs):
+            issue_id = kwargs['issue_id']
             if project_id is None:
                 raise RedmineApiError("You must provide an issue_id")
-            result = self.redmine._apiGet('issues/%s' % issue_id)['issue']
+            result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))['issue']
             return Issue(result)
         
-        def getList(self,**kwargs):
-            results = json.loads(self.redmine._apiGet('issues',kwargs))
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('issues', kwargs))
             return [Issue(i) for i in results['issues']]
 
 
@@ -180,15 +180,15 @@ class Redmine(object):
         def __init__(self, redmine):
             self.redmine = redmine
         
-        def get(self,**kwargs):
-            project_id = kwargs=['project_id']
+        def get(self, **kwargs):
+            project_id = kwargs['project_id']
             if project_id is None:
                 raise RedmineApiError("You must provide a project_id")
-            result = self.redmine._apiGet('projects/%s' % project_id)['project']
+            result = json.loads(self.redmine._apiGet('projects/%s' % project_id))['project']
             return Project(result)
         
-        def getList(self,**kwargs):
-            results = json.loads(self.redmine._apiGet('projects',kwargs))
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('projects', kwargs))
             return [Project(p) for p in results['projects']]
     
     @property
