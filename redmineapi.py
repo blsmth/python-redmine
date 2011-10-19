@@ -65,7 +65,7 @@ class Issue(RedmineApiObject):
     def __str__(self):
         #return json.dumps(self.__dict__)
         return '%s - %s - %s - %s' % (self.id,
-                                 self.project['name'],
+                                        self.project['name'],
                                         self.author['name'],
                                         self.subject)
       
@@ -75,6 +75,10 @@ class Issue(RedmineApiObject):
                                         self.author['name'],
                                         self.subject,
                                         self.description)
+
+    def newFromApi(self, content):
+        d = json.loads(content)['issue']
+        self.__dict__.update(d) 
 
     def save(self, r):
         ''' saves a new issue to the given API instance from Issue instance 
@@ -96,7 +100,15 @@ class Project(RedmineApiObject):
     def __repr__(self):
         return "New Redmine Project Object"
 
-
+class User(RedmineApiObject):
+    ''' Redmine User Object '''
+    
+    def __str__(self):
+        return '%s - %s - %s, %s' % (self.id, self.login, self.lastname, self.firstname)
+    
+    def __repr__(self):
+        return "New Redmine User Object"
+    
 class Redmine(object):
     
     
@@ -161,7 +173,7 @@ class Redmine(object):
         
         def get(self, **kwargs):
             issue_id = kwargs['issue_id']
-            if project_id is None:
+            if issue_id is None:
                 raise RedmineApiError("You must provide an issue_id")
             result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))['issue']
             return Issue(result)
@@ -194,4 +206,24 @@ class Redmine(object):
     @property
     def projects(self):
         return self._projects(self)
+    
+    class _users(object):
+        def __init__(self, redmine):
+            self.redmine = redmine
+        
+        def get(self, **kwargs):
+            user_id = kwargs['user_id']
+            if user_id is None:
+                raise RedmineApiError("You must provide a user_id")
+            result = json.loads(self.redmine._apiGet('users/%s' % user_id))['user']
+            return User(result)
+        
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('users', kwargs))
+            return [User(u) for u in results['users']]
+
+    @property
+    def users(self):
+        return self._users(self)
+    
     
