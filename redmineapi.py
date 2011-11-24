@@ -46,6 +46,14 @@ try:
 except ImportError:
     import simplejson as json
 
+import logging
+logger = logging.getLogger('redmine-api')
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('[%(levelname)s] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 class RedmineApiError(Exception):
             """ Exception for Redmine API errors """
@@ -55,20 +63,26 @@ class RedmineApiObject(object):
     def __init__(self,d):
         self.__dict__ = d
 
+
+
+
 class Issue(RedmineApiObject):
     ''' Redmine Issue Object '''
 
+    def __init__(self,d,redmine=None):
+        self.__dict__ = d
+        self.redmine = redmine
             
     def __repr__(self):
         return "Redmine Issue Object"    
         
     def __str__(self):
-        #return json.dumps(self.__dict__)
-        return '%s - %s - %s - %s' % (self.id,
-                                 self.project['name'],
-                                        self.author['name'], 
-                                        self.subject)
-      
+        return json.dumps(self.__dict__)
+        #return '%s - %s - %s - %s' % (self.id,
+        #                         self.project['name'],
+        #                                self.author['name'], 
+        #                                self.subject)
+        
 
     def __unicode__(self):
         return '%s - %s - %s \n\n %s' % (self.id,
@@ -85,14 +99,26 @@ class Issue(RedmineApiObject):
         content = r._apiPost('issues',new_issue)
         return self.newFromApi(content)
     
+    def close(self,notes=None):
+        issue_id = self.id
+        issue = {"issue": { "status_id": 5, 'notes': '**closed from python-redmine api**' }}
+        content = self.redmine._apiPost('issues/%s' % issue_id,issue)
+        print content
+    
+    def resolve(self,notes=None):
+        issue_id = self.id
+        issue = { "issue": { "status_id": 3, 'notes': '**resolved from python-redmine api**' }}
+        content = self.redmine._apiPost('issues/%s' % issue_id,issue)
+        print content
+
     
     
 class Project(RedmineApiObject):
     ''' Redmine Project Object '''
     
     def __str__(self):
-        return '%s - %s - %s' % (self.id, self.name, self.description)
-    
+        #return '%s - %s - %s' % (self.id, self.name, self.description)
+        return self.__dict__
     def __repr__(self):
         return "New Redmine Project Object"
 
@@ -140,14 +166,16 @@ class Redmine(object):
         self.check_reqs(func)
     
         api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
+        logger.info(api_url)
         try:
             
             h = httplib2.Http()
             resp, content = h.request(api_url,
-                          'POST',
+                          'PUT',
                           json.dumps(params),
                           headers={'Content-Type': 'application/json'})
-            
+            print content
+            print json.dumps(params)
             return content
         except HTTPError, e:
             raise RedmineApiError("HTTPError - %s" % e.read())
@@ -159,16 +187,27 @@ class Redmine(object):
         def __init__(self, redmine):
             self.redmine = redmine
         
-        def get(self,**kwargs):
-            issue_id = kwargs=['issue_id']
-            if project_id is None:
+        def get(self,issue_id):
+            #issue_id = kwargs=['issue_id']
+            if issue_id is None:
                 raise RedmineApiError("You must provide an issue_id")
-            result = self.redmine._apiGet('issues/%s' % issue_id)['issue']
-            return Issue(result)
+            result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
+            return Issue(result['issue'],self.redmine)
         
         def getList(self,**kwargs):
             results = json.loads(self.redmine._apiGet('issues',kwargs))
             return [Issue(i) for i in results['issues']]
+        
+        def new(self,issue):
+            if issue is None:
+                raise RedmineApiError("You must provide an Issue Object or a dictionary")
+            if isinstance(issue,Issue):
+                new_issue = {'issue': issue.__dict__}
+            else:
+                new_issue = {'issue': issue }
+            content = self.redmine._apiPost('issues',new_issue)
+            print content
+            
 
 
     @property
