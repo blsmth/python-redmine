@@ -89,6 +89,10 @@ class Issue(RedmineApiObject):
         content = r._apiPost('issues', new_issue)
         return self.newFromApi(content)
     
+    def update(self, r):
+        issue = { 'issue': self.__dict__ }
+        content = r._apiPut('issues', issue)
+        return self.newFromApi(content)
     
     
 class Project(RedmineApiObject):
@@ -153,20 +157,36 @@ class Redmine(object):
     
         api_url = 'http://%s/%s.json?key=%s' % (self.hostname, func, self.apikey)
         try:
-            
             h = httplib2.Http()
             resp, content = h.request(api_url,
                           'POST',
                           json.dumps(params),
                           headers={'Content-Type': 'application/json'})
-            
             return content
         except HTTPError, e:
             raise RedmineApiError("HTTPError - %s" % e.read())
         except (ValueError, KeyError), e:
             raise RedmineApiError('Invalid Response - %s' % e.code())        
 
-
+    def _apiPut(self, func, params=None):
+        self.check_reqs(func)
+        api_url = 'http://%s/%s.json?key=%s' % (self.hostname, func, self.apikey)
+        try:
+            
+            h = httplib2.Http()
+            resp, content = h.request(api_url,
+                          'PUT',
+                          json.dumps(params),
+                          headers={'Content-Type': 'application/json'})
+            #note: PUT doesn't include any content in the response
+            if resp['status'] != '200':
+                raise Exception('Invalid response %s', resp['status'])
+            return content
+        except HTTPError, e:
+            raise RedmineApiError("HTTPError - %s" % e.read())
+        except (ValueError, KeyError), e:
+            raise RedmineApiError('Invalid Response - %s' % e.code())  
+        
     class _issues(object):
         def __init__(self, redmine):
             self.redmine = redmine
@@ -178,6 +198,34 @@ class Redmine(object):
             result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))['issue']
             return Issue(result)
         
+        def set(self, **kwargs):
+            issue_id = kwargs['issue_id']
+            if issue_id is None:
+                raise RedmineApiError("You must provide an issue_id")
+            #get the issue first
+            data = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
+            #update with k/v. Should probably only update the allowed ones.
+            for k,v in kwargs.iteritems():
+                data['issue'][k] = v
+            result = self.redmine._apiPut('issues/%s' % issue_id, data)
+            #PUT doesnt seem to return anything, so get the issue, and return it.
+            return self.get(**kwargs)
+        
+        def addNote(self, **kwargs):
+            # does not work, probably not implemented :(
+            issue_id = kwargs['issue_id']
+            if issue_id is None:
+                raise RedmineApiError("You must provide an issue_id")
+            data = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
+            if not getattr(data, 'journals', None):
+                data['journals'] = []
+            new_note = { "notes": "Adding a test note!", 
+                         "details": [],}
+            data['journals'].append(new_note)
+            ret = self.redmine._apiPut('issues/%s' % issue_id, data)
+            #result = json.loads(self.redmine._apiPut('issues/%s' % issue_id, data))
+            return Issue(result)
+            
         def getList(self, **kwargs):
             results = json.loads(self.redmine._apiGet('issues', kwargs))
             return [Issue(i) for i in results['issues']]
