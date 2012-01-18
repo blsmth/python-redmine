@@ -117,6 +117,11 @@ class Issue(RedmineApiObject):
         content = self.redmine._apiPut('issues/%s' % issue_id,issue)
         print content
 
+    def annotate(self, notes):
+        issue_id = self.id
+        issue = {"issue": {'notes':  notes}}
+        content = self.redmine._apiPut('issues/%s' % issue_id, issue)
+        print content
         
 class Project(RedmineApiObject):
     ''' Redmine Project Object '''
