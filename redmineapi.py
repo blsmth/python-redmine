@@ -55,6 +55,16 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+
+
+ISSUE_STATUS = {} 
+ISSUE_STATUS['new'] = 1
+ISSUE_STATUS['resolved'] = 3 
+ISSUE_STATUS['closed'] = 5
+       
+
+
+
 class RedmineApiError(Exception):
             """ Exception for Redmine API errors """
 
@@ -75,7 +85,7 @@ class Issue(RedmineApiObject):
         return "Redmine Issue Object"    
         
     def __str__(self):
-        return json.dumps(self.__dict__)
+        return str(self.__dict__)
         #return '%s - %s - %s - %s' % (self.id,
         #                         self.project['name'],
         #                                self.author['name'], 
@@ -107,13 +117,21 @@ class Issue(RedmineApiObject):
 
     def close(self,notes=None):
         issue_id = self.id
-        issue = {"issue": { "status_id": 5, 'notes': '**closed from python-redmine api**' }}
+        issue = { "issue": { 
+                    "status_id": ISSUE_STATUS['closed'], 
+                    'notes': '%s <br/><br/><br/>%s' % (notes, '*closed from python-redmine api*') 
+                    }
+                }
         content = self.redmine._apiPut('issues/%s' % issue_id,issue)
         print content
     
     def resolve(self,notes=None):
         issue_id = self.id
-        issue = { "issue": { "status_id": 3, 'notes': '**resolved from python-redmine api**' }}
+        issue = { "issue": { 
+                    "status_id": ISSUE_STATUS['resolved'], 
+                    'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
+                    }
+                }
         content = self.redmine._apiPut('issues/%s' % issue_id,issue)
         print content
 
@@ -144,12 +162,7 @@ class User(RedmineApiObject):
     
 class Redmine(object):
     
-    def __init__(self, hostname=None, apikey=None):
-        # Status ID from a default install
-       self.ISSUE_STATUS = {} 
-       self.ISSUE_STATUS['new'] = 1
-       self.ISSUE_STATUS['resolved'] = 3 
-       self.ISSUE_STATUS['CLOSE'] = 3
+    def __init__(self,hostname=None,apikey=None):
        self.apikey = apikey
        self.hostname = hostname
     
