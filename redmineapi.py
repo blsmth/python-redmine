@@ -55,14 +55,10 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-
-
 ISSUE_STATUS = {} 
 ISSUE_STATUS['new'] = 1
 ISSUE_STATUS['resolved'] = 3 
 ISSUE_STATUS['closed'] = 5
-       
-
 
 
 class RedmineApiError(Exception):
@@ -70,16 +66,14 @@ class RedmineApiError(Exception):
 
 
 class RedmineApiObject(object):
-    def __init__(self,d):
+    def __init__(self, d):
         self.__dict__ = d
-
-
 
 
 class Issue(RedmineApiObject):
     ''' Redmine Issue Object '''
 
-    def __init__(self,d,redmine=None):
+    def __init__(self, d, redmine=None):
         self.__dict__ = d
         self.redmine = redmine
             
@@ -92,45 +86,57 @@ class Issue(RedmineApiObject):
         #                         self.project['name'],
         #                                self.author['name'], 
         #                                self.subject)
-        
 
     def __unicode__(self):
         return '%s - %s - %s \n\n %s' % (self.id,
-                                        self.author['name'], 
-                                        self.subject, 
+                                        self.author['name'],
+                                        self.subject,
                                         self.description)
 
-    def save(self,r):
+    def newFromApi(self, content):
+        d = json.loads(content)['issue']
+        self.__dict__.update(d) 
+
+    def save(self, r):
         ''' saves a new issue to the given API instance from Issue instance 
             if you need to update an issue, use update() instead.
         '''
         new_issue = {
                     'issue': self.__dict__}
-        content = r._apiPost('issues',new_issue)
+        content = r._apiPost('issues', new_issue)
         return self.newFromApi(content)
     
-    def close(self,notes=None):
+    def update(self, r):
+        issue = { 'issue': self.__dict__ }
+        content = r._apiPut('issues', issue)
+        return self.newFromApi(content)
+
+    def close(self, notes=None):
         issue_id = self.id
         issue = { "issue": { 
-                    "status_id": ISSUE_STATUS['closed'], 
+                    "status_id": ISSUE_STATUS['closed'],
                     'notes': '%s <br/><br/><br/>%s' % (notes, '*closed from python-redmine api*') 
                     }
                 }
-        content = self.redmine._apiPost('issues/%s' % issue_id,issue)
+        content = self.redmine._apiPut('issues/%s' % issue_id, issue)
         print content
     
-    def resolve(self,notes=None):
+    def resolve(self, notes=None):
         issue_id = self.id
         issue = { "issue": { 
-                    "status_id": ISSUE_STATUS['resolved'], 
+                    "status_id": ISSUE_STATUS['resolved'],
                     'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
                     }
                 }
-        content = self.redmine._apiPost('issues/%s' % issue_id,issue)
+        content = self.redmine._apiPut('issues/%s' % issue_id, issue)
         print content
 
-    
-    
+    def annotate(self, notes):
+        issue_id = self.id
+        issue = {"issue": {'notes':  notes}}
+        content = self.redmine._apiPut('issues/%s' % issue_id, issue)
+        print content
+        
 class Project(RedmineApiObject):
     ''' Redmine Project Object '''
     
@@ -141,15 +147,29 @@ class Project(RedmineApiObject):
         return "New Redmine Project Object"
 
 
+class User(RedmineApiObject):
+    ''' Redmine User Object '''
+    
+    def __str__(self):
+        return '%s - %s - %s, %s' % (self.id, self.login, 
+                                     self.lastname, self.firstname)
+    
+    def __repr__(self):
+        return "New Redmine User Object"
+    
 class Redmine(object):
     
-    
-    def __init__(self,hostname=None,apikey=None):
-       self.apikey = apikey
-       self.hostname = hostname
-    
-   
-    def check_reqs(self,func=None):
+    def __init__(self, hostname=None, apikey=None, ssl=False, easy_ssl=True):
+        self.apikey = apikey
+        self.hostname = hostname
+        self.ssl = ssl
+        self.easy_ssl = easy_ssl
+        if self.ssl:
+            self.scheme = 'https'
+        else:
+            self.scheme = 'http'
+           
+    def check_reqs(self, func=None):
         if self.hostname is None:
             raise RedmineApiError('You must supply a Hostname to your redmine installation.')
         if self.apikey is None:
@@ -157,14 +177,14 @@ class Redmine(object):
         if func is None:
             raise RedmineApiError('Missing function call.')
     
-    
-    def _apiGet(self,func,params=None):
+    def _apiGet(self, func, params=None):
         self.check_reqs(func)
         
-        api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
+        api_url = '%s://%s/%s.json?key=%s' % (self.scheme, self.hostname, 
+                                              func, self.apikey)
         try:
-            h = httplib2.Http()
-            resp,content = h.request(api_url,
+            h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
+            resp, content = h.request(api_url,
                             'GET',
                             json.dumps(params),
                             headers={'Content-Type': 'application/json'})
@@ -174,19 +194,19 @@ class Redmine(object):
         except (ValueError, KeyError), e:
             raise RedmineApiError('Invalid Response - %s', e.code())         
                 
-
-    def _apiPost(self,func,params=None):
+    def _apiPost(self, func, params=None):
         self.check_reqs(func)
     
-        api_url = 'http://%s/%s.json?key=%s' % (self.hostname,func,self.apikey)
+        api_url = '%s://%s/%s.json?key=%s' % (self.scheme, self.hostname, 
+                                              func, self.apikey)
         logger.info(api_url)
         try:
-            
-            h = httplib2.Http()
+            h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
             resp, content = h.request(api_url,
-                          'PUT',
+                          'POST',
                           json.dumps(params),
                           headers={'Content-Type': 'application/json'})
+
             print content
             print json.dumps(params)
             return content
@@ -195,33 +215,63 @@ class Redmine(object):
         except (ValueError, KeyError), e:
             raise RedmineApiError('Invalid Response - %s' % e.code())        
 
+    def _apiPut(self, func, params=None):
+        self.check_reqs(func)
+        api_url = '%s://%s/%s.json?key=%s' % (self.scheme, self.hostname, func, self.apikey)
+        try:
+            
+            h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
+            resp, content = h.request(api_url,
+                          'PUT',
+                          json.dumps(params),
+                          headers={'Content-Type': 'application/json'})
+            #note: PUT doesn't include any content in the response
+            if resp['status'] != '200':
+                raise Exception('Invalid response %s', resp['status'])
+            return content
+        except HTTPError, e:
+            raise RedmineApiError("HTTPError - %s" % e.read())
+        except (ValueError, KeyError), e:
+            raise RedmineApiError('Invalid Response - %s' % e.code())  
 
+        
     class _issues(object):
         def __init__(self, redmine):
             self.redmine = redmine
         
-        def get(self,issue_id):
+        def get(self, issue_id):
             #issue_id = kwargs=['issue_id']
             if issue_id is None:
                 raise RedmineApiError("You must provide an issue_id")
             result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
-            return Issue(result['issue'],self.redmine)
+            return Issue(result['issue'], self.redmine)
         
-        def getList(self,**kwargs):
-            results = json.loads(self.redmine._apiGet('issues',kwargs))
+        def set(self, **kwargs):
+            issue_id = kwargs['issue_id']
+            if issue_id is None:
+                raise RedmineApiError("You must provide an issue_id")
+            #get the issue first
+            data = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
+            #update with k/v. Should probably only update the allowed ones.
+            for k, v in kwargs.iteritems():
+                data['issue'][k] = v
+            result = self.redmine._apiPut('issues/%s' % issue_id, data)
+            #PUT doesnt seem to return anything, so get the issue, and return it.
+            return self.get(**kwargs)
+            
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('issues', kwargs))
             return [Issue(i) for i in results['issues']]
         
-        def new(self,issue):
+        def new(self, issue):
             if issue is None:
                 raise RedmineApiError("You must provide an Issue Object or a dictionary")
-            if isinstance(issue,Issue):
+            if isinstance(issue, Issue):
                 new_issue = {'issue': issue.__dict__}
             else:
                 new_issue = {'issue': issue }
-            content = self.redmine._apiPost('issues',new_issue)
+            content = self.redmine._apiPost('issues', new_issue)
             print content
-            
-
 
     @property
     def issues(self):
@@ -232,18 +282,39 @@ class Redmine(object):
         def __init__(self, redmine):
             self.redmine = redmine
         
-        def get(self,**kwargs):
-            project_id = kwargs=['project_id']
+        def get(self, **kwargs):
+            project_id = kwargs['project_id']
             if project_id is None:
                 raise RedmineApiError("You must provide a project_id")
-            result = self.redmine._apiGet('projects/%s' % project_id)['project']
+            result = json.loads(self.redmine._apiGet('projects/%s' % project_id))['project']
             return Project(result)
         
-        def getList(self,**kwargs):
-            results = json.loads(self.redmine._apiGet('projects',kwargs))
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('projects', kwargs))
             return [Project(p) for p in results['projects']]
     
     @property
     def projects(self):
         return self._projects(self)
+
+    
+    class _users(object):
+        def __init__(self, redmine):
+            self.redmine = redmine
+        
+        def get(self, **kwargs):
+            user_id = kwargs['user_id']
+            if user_id is None:
+                raise RedmineApiError("You must provide a user_id")
+            result = json.loads(self.redmine._apiGet('users/%s' % user_id))['user']
+            return User(result)
+        
+        def getList(self, **kwargs):
+            results = json.loads(self.redmine._apiGet('users', kwargs))
+            return [User(u) for u in results['users']]
+
+    @property
+    def users(self):
+        return self._users(self)
+    
     
