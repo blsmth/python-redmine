@@ -97,45 +97,41 @@ class Issue(RedmineApiObject):
         d = json.loads(content)['issue']
         self.__dict__.update(d) 
 
-    def save(self, r):
+    def save(self):
         ''' saves a new issue to the given API instance from Issue instance 
             if you need to update an issue, use update() instead.
         '''
         new_issue = {
                     'issue': self.__dict__}
-        content = r._apiPost('issues', new_issue)
+        content = self.redmine._apiPost('issues', new_issue)
         return self.newFromApi(content)
     
-    def update(self, r):
+    def update(self):
         issue = { 'issue': self.__dict__ }
-        content = r._apiPut('issues', issue)
-        return self.newFromApi(content)
+        content = self.redmine._apiPut('issues/%s' % self.id, issue)
+        if content.strip():
+            return self.newFromApi(content)
 
     def close(self, notes=None):
-        issue_id = self.id
-        issue = { "issue": { 
-                    "status_id": ISSUE_STATUS['closed'],
-                    'notes': '%s <br/><br/><br/>%s' % (notes, '*closed from python-redmine api*') 
-                    }
-                }
-        content = self.redmine._apiPut('issues/%s' % issue_id, issue)
-        print content
+        self.update_status(ISSUE_STATUS['closed'], notes=notes)
     
     def resolve(self, notes=None):
+        self.update_status(ISSUE_STATUS['resolved'], notes=notes)
+
+    def update_status(self, status_id, notes=None):
         issue_id = self.id
-        issue = { "issue": { 
-                    "status_id": ISSUE_STATUS['resolved'],
-                    'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
-                    }
-                }
+        issue = {
+            "issue": {
+                "status_id": status_id,
+                'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
+            }
+        }
         content = self.redmine._apiPut('issues/%s' % issue_id, issue)
-        print content
 
     def annotate(self, notes):
         issue_id = self.id
         issue = {"issue": {'notes':  notes}}
         content = self.redmine._apiPut('issues/%s' % issue_id, issue)
-        print content
         
 class Project(RedmineApiObject):
     ''' Redmine Project Object '''
@@ -206,9 +202,6 @@ class Redmine(object):
                           'POST',
                           json.dumps(params),
                           headers={'Content-Type': 'application/json'})
-
-            print content
-            print json.dumps(params)
             return content
         except HTTPError, e:
             raise RedmineApiError("HTTPError - %s" % e.read())
@@ -261,7 +254,7 @@ class Redmine(object):
             
         def getList(self, **kwargs):
             results = json.loads(self.redmine._apiGet('issues', kwargs))
-            return [Issue(i) for i in results['issues']]
+            return [Issue(i, redmine=self.redmine) for i in results['issues']]
         
         def new(self, issue):
             if issue is None:
@@ -271,7 +264,6 @@ class Redmine(object):
             else:
                 new_issue = {'issue': issue }
             content = self.redmine._apiPost('issues', new_issue)
-            print content
 
     @property
     def issues(self):
