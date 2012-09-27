@@ -95,7 +95,7 @@ class Issue(RedmineApiObject):
 
     def newFromApi(self, content):
         d = json.loads(content)['issue']
-        self.__dict__.update(d) 
+        self.__dict__.update(d)
 
     def save(self):
         ''' saves a new issue to the given API instance from Issue instance 
@@ -180,6 +180,8 @@ class Redmine(object):
                                               func, self.apikey)
         try:
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
+            if params is not None:
+                params['issue']['redmine'] = ''
             resp, content = h.request(api_url,
                             'GET',
                             json.dumps(params),
@@ -198,6 +200,8 @@ class Redmine(object):
         logger.info(api_url)
         try:
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
+            if params is not None:
+                params['issue']['redmine'] = ''
             resp, content = h.request(api_url,
                           'POST',
                           json.dumps(params),
@@ -214,6 +218,8 @@ class Redmine(object):
         try:
             
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
+            if params is not None:
+                params['issue']['redmine'] = ''
             resp, content = h.request(api_url,
                           'PUT',
                           json.dumps(params),
@@ -237,7 +243,7 @@ class Redmine(object):
             if issue_id is None:
                 raise RedmineApiError("You must provide an issue_id")
             result = json.loads(self.redmine._apiGet('issues/%s' % issue_id))
-            return Issue(result['issue'], self.redmine)
+            return Issue(result['issue'], redmine=self.redmine)
         
         def set(self, **kwargs):
             issue_id = kwargs['issue_id']
