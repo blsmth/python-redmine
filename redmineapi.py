@@ -180,7 +180,7 @@ class Redmine(object):
                                               func, self.apikey)
         try:
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
-            if params is not None:
+            if params is not None and 'issue' in params.keys():
                 params['issue']['redmine'] = ''
             resp, content = h.request(api_url,
                             'GET',
