@@ -26,7 +26,7 @@ __copyright__ = "Copyright (c) 2010 National Priorities Project"
 __license__ = "BSD"
 
 
-
+import datetime
 import sys
 import warnings
 
@@ -106,8 +106,11 @@ class Issue(RedmineApiObject):
         content = self.redmine._apiPost('issues', new_issue)
         return self.newFromApi(content)
     
-    def update(self):
-        issue = { 'issue': self.__dict__ }
+    def update(self, data=None):
+        if data is None:
+            issue = {'issue': self.__dict__,}
+        else:
+            issue = {'issue': data,}
         content = self.redmine._apiPut('issues/%s' % self.id, issue)
         if content.strip():
             return self.newFromApi(content)
@@ -123,7 +126,7 @@ class Issue(RedmineApiObject):
         issue = {
             "issue": {
                 "status_id": status_id,
-                'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
+                # 'notes': '%s <br/><br/><br/>%s' % (notes, '*resolved from python-redmine api*') 
             }
         }
         content = self.redmine._apiPut('issues/%s' % issue_id, issue)
@@ -132,6 +135,26 @@ class Issue(RedmineApiObject):
         issue_id = self.id
         issue = {"issue": {'notes':  notes}}
         content = self.redmine._apiPut('issues/%s' % issue_id, issue)
+
+    def assign_to(self, user_id):
+        '''
+        Takes redmine user id as input and assigns the issue to that user.
+        Also changes the issue status to selected.
+        '''
+        data = self.__dict__
+        data['assigned_to'] = user_id
+        data['status_id'] = 12
+        return self.update(data)
+
+    @property
+    def last_updated(self):
+        '''
+        Return python datetime object for last updation date.
+        '''
+        try:
+            return datetime.datetime.strptime(self.updated_on[:-6], '%Y/%m/%d %H:%M:%S')
+        except ValueError:
+            pass
         
 class Project(RedmineApiObject):
     ''' Redmine Project Object '''
@@ -173,11 +196,11 @@ class Redmine(object):
         if func is None:
             raise RedmineApiError('Missing function call.')
     
-    def _apiGet(self, func, params=None):
+    def _apiGet(self, func, params=None, extra_querystring=''):
         self.check_reqs(func)
         
-        api_url = '%s://%s/%s.json?key=%s' % (self.scheme, self.hostname, 
-                                              func, self.apikey)
+        api_url = '%s://%s/%s.json?key=%s&%s' % (self.scheme, self.hostname, 
+                                              func, self.apikey, extra_querystring)
         try:
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
             if params is not None and 'issue' in params.keys():
@@ -216,7 +239,6 @@ class Redmine(object):
         self.check_reqs(func)
         api_url = '%s://%s/%s.json?key=%s' % (self.scheme, self.hostname, func, self.apikey)
         try:
-            
             h = httplib2.Http(disable_ssl_certificate_validation=self.easy_ssl)
             if params is not None:
                 params['issue']['redmine'] = ''
@@ -259,7 +281,10 @@ class Redmine(object):
             return self.get(**kwargs)
             
         def getList(self, **kwargs):
-            results = json.loads(self.redmine._apiGet('issues', kwargs))
+            querystring = {'status_id': '*'}
+            querystring.update(kwargs)
+            querystring = urlencode(querystring)
+            results = json.loads(self.redmine._apiGet('issues', kwargs, extra_querystring=querystring))
             return [Issue(i, redmine=self.redmine) for i in results['issues']]
         
         def new(self, issue):
